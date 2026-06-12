@@ -1,9 +1,9 @@
 {
   "name": "Base Image Dev Workspace",
-  "image": "mcr.microsoft.com/devcontainers/base:alpine",
+  "image": "mcr.microsoft.com/devcontainers/ubuntu:24.04",
   "features": {
     // Installs and configures Docker inside your dev environment safely
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+    "ghcr.io/devcontainers/features/docker-in-docker:1": {
       "version": "latest",
       "moby": true
     }
