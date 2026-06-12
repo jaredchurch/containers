@@ -52,7 +52,9 @@ jobs:
             TOKEN="${{ secrets.GITHUB_TOKEN }}"
             RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
               "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
+            echo "Raw API response: $RESPONSE"
             MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
+            echo "Parsed max version number: $MAX"
             NEW_TAG="v$((MAX + 1))"
             TAGS="$TAGS,$BASE:$NEW_TAG"
             echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
