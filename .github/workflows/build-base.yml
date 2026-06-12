@@ -55,7 +55,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.next-version.outputs.tag }}
+          # ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.next-version.outputs.tag }}
           # Optimises subsequent runs by caching build layers securely inside GitHub
           cache-from: type=gha
           cache-to: type=gha,mode=max
