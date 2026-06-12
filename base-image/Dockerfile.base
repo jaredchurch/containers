@@ -17,6 +17,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
       gnupg \
       unzip \
       sudo \
+      ssh \
     && apt-get clean
 
 # Install PowerShell from the Microsoft repository
@@ -41,11 +42,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 
 # Create a new user named 'developer' and assign a shell
-# RUN useradd -m -s /bin/bash developer
+RUN useradd -m -s /bin/bash developer
 
 # Add the user to the sudo group
-# RUN usermod -aG sudo developer
+RUN usermod -aG sudo developer
 
 # Optional: Allow the user to run sudo without a password
-# RUN echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+RUN echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
+USER developer
+
+
+### End of File
