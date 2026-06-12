@@ -1,6 +1,6 @@
 {
   "name": "Base Image Dev Workspace",
-  "image": "mcr.microsoft.com/devcontainers/python:3.10-trixie",
+  "image": "mcr.microsoft.com/devcontainers/base:alpine",
   "features": {
     // Installs and configures Docker inside your dev environment safely
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
