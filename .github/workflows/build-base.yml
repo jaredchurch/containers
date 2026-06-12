@@ -11,10 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # This automatically formats to: ghcr.io/your-github-username/base
   IMAGE_NAME: ${{ github.repository_owner }}/base
-  # Creates a sequential integer tag like 'v1', 'v2', 'v3' automatically
-  VERSION_TAG: v${{ github.run_number }}
 
 jobs:
   build-and-push:
@@ -37,18 +34,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine next version tag
+        id: next-version
+        run: |
+          TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+            "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
+          MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
+          echo "tag=v$((MAX + 1))" >> "$GITHUB_OUTPUT"
+          echo "Building base image version: v$((MAX + 1))"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: ./base-image
           file: ./base-image/Dockerfile.base
           push: true
-          # Tags the image with both the unique sequential integer and updates latest
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          # Add next line above with indent to also publish a version tag (e.g. v1, v2, ...)
+          # ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.next-version.outputs.tag }}
           # Optimises subsequent runs by caching build layers securely inside GitHub
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-
-#            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION_TAG }}
