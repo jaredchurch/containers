@@ -11,8 +11,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # This automatically formats to: ghcr.io/your-github-username/my-shared-base
-  IMAGE_NAME: ${{ github.repository_owner }}/my-shared-base
+  # This automatically formats to: ghcr.io/your-github-username/base
+  IMAGE_NAME: ${{ github.repository_owner }}/base
   # Creates a sequential integer tag like 'v1', 'v2', 'v3' automatically
   VERSION_TAG: v${{ github.run_number }}
 
@@ -45,8 +45,10 @@ jobs:
           push: true
           # Tags the image with both the unique sequential integer and updates latest
           tags: |
-            # ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           # Optimises subsequent runs by caching build layers securely inside GitHub
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+
+#            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION_TAG }}
