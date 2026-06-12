@@ -54,7 +54,7 @@ jobs:
               "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
             MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
             NEW_TAG="v$((MAX + 1))"
-            # TAGS="$TAGS,$BASE:$NEW_TAG"
+            TAGS="$TAGS,$BASE:$NEW_TAG"
             echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
             echo "Building base image version: $NEW_TAG"
           fi
