@@ -1,6 +1,6 @@
 {
   "name": "Base Image Dev Workspace",
-  "image": "ghcr.io/jaredchurch/base:v1",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
     "./features/opencode": {}
   //  // Installs and configures Docker inside your dev environment safely
