@@ -41,9 +41,6 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && rm -rf /var/lib/apt/lists/*
 
 
-# Create a new user named 'developer' and assign a shell
-RUN useradd -m -s /bin/bash vscode
-
 # Add the user to the sudo group
 RUN usermod -aG sudo vscode
 
