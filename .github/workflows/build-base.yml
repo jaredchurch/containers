@@ -58,6 +58,7 @@ jobs:
             echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
             echo "Building base image version: $NEW_TAG"
           fi
+          echo "Tags to push: $TAGS"
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
