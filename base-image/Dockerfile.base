@@ -1,5 +1,5 @@
 # Use the official Python 3.10 image built on Debian Trixie Slim
-FROM python:3.10-slim-trixie
+FROM mcr.microsoft.com/devcontainers/python:3.10-trixie
 
 # Prevent Python from writing .pyc files to disk
 ENV PYTHONDONTWRITEBYTECODE=1
