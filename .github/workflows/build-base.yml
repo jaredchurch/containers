@@ -2,12 +2,16 @@ name: Build and Push Custom Base Image
 
 on:
   push:
-    branches:
-      - main
-    # ⚡ Only runs if you actually change the base image files
     paths:
       - 'base-image/**'
       - '.github/workflows/build-base.yml'
+  workflow_dispatch:
+    inputs:
+      publish_version:
+        description: 'Also publish a version tag (v1, v2, ...)'
+        required: true
+        default: false
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -18,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # Required to publish images to GHCR
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -37,15 +41,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine next version tag
-        id: next-version
+      - name: Generate tags
+        id: tags
         run: |
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
-            "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
-          MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
-          echo "tag=v$((MAX + 1))" >> "$GITHUB_OUTPUT"
-          echo "Building base image version: v$((MAX + 1))"
+          BASE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          TAGS="$BASE:latest"
+          echo "version_tag=" >> "$GITHUB_OUTPUT"
+          SHOULD_VERSION="${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_version == 'true') }}"
+          if [[ "$SHOULD_VERSION" == "true" ]]; then
+            TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+              "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
+            MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
+            NEW_TAG="v$((MAX + 1))"
+            # TAGS="$TAGS,$BASE:$NEW_TAG"
+            echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+            echo "Building base image version: $NEW_TAG"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
@@ -53,9 +66,6 @@ jobs:
           context: ./base-image
           file: ./base-image/Dockerfile.base
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          # ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.next-version.outputs.tag }}
-          # Optimises subsequent runs by caching build layers securely inside GitHub
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
