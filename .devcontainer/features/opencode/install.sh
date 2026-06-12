@@ -4,7 +4,7 @@ set -e
 if [ ! -x "$(command -v node)" ] || [ ! -x "$(command -v npm)" ]; then
   echo "Node.js and npm are not installed. Installing them first..."
   DEBIAN_FRONTEND=noninteractive apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install nodejs npm -y
+  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends nodejs npm -y
 fi
 
 if [ -x "$(command -v opencode)" ]; then
