@@ -47,13 +47,23 @@ jobs:
           BASE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           TAGS="$BASE:latest"
           echo "version_tag=" >> "$GITHUB_OUTPUT"
+
+          SCOPE="repository:${{ env.IMAGE_NAME }}:pull"
+          AUTH_TOKEN=$(curl -s "https://${{ env.REGISTRY }}/token?service=${{ env.REGISTRY }}&scope=$SCOPE" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r '.token')
+          echo "Auth token obtained: ${AUTH_TOKEN:0:20}..."
+
+          RESPONSE=$(curl -s -H "Authorization: Bearer $AUTH_TOKEN" \
+            "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
+          echo "Raw API response: $RESPONSE"
+
+          MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
+          echo "Parsed max version number: $MAX"
+
           SHOULD_VERSION="${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_version == 'true') }}"
+          NEW_TAG="v$((MAX + 1))"
+          echo "New Tag: $NEW_TAG, Should version: $SHOULD_VERSION"
           if [[ "$SHOULD_VERSION" == "true" ]]; then
-            TOKEN="${{ secrets.GITHUB_TOKEN }}"
-            RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
-              "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
-            MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
-            NEW_TAG="v$((MAX + 1))"
             TAGS="$TAGS,$BASE:$NEW_TAG"
             echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
             echo "Building base image version: $NEW_TAG"
