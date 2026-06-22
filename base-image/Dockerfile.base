@@ -45,6 +45,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl https://bws.bitwarden.com/install | sh
+
 # allow users to read the root home directory, which is required for devpods to work properly (setting github user info)
 RUN chmod a+rx /root
 
