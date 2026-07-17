@@ -1,0 +1,6 @@
+{
+  "id": "bitwarden-secrets-manager",
+  "version": "1.0.0",
+  "name": "Bitwarden Secrets Manager",
+  "description": "Install Bitwarden Secrets Manager"
+}

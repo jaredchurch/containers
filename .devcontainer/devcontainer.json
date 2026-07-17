@@ -2,6 +2,7 @@
   "name": "Base Image Dev Workspace",
   "image": "ghcr.io/jaredchurch/base:v1",
   "features": {
+    "./features/bitwarden-secrets-manager": {},
     "./features/opencode": {}
   //  // Installs and configures Docker inside your dev environment safely
   //  "ghcr.io/devcontainers/features/docker-in-docker:1": {
