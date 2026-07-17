@@ -16,5 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+ARG USERNAME=airflow
+RUN useradd -m -s /bin/bash $USERNAME \
+    && usermod -aG sudo $USERNAME
+
+# Configure passwordless sudo for this specific user
+RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+
 # Switch back to the standard non-root user that Airflow expects
-USER airflow
+USER $USERNAME
+
+### End of File
