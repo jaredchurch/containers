@@ -7,6 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    procps \
+    nodejs \
+    npm \
+    wget \
+    gnupg \
+    unzip \
+    sudo \
+    ssh \
+    locales \
     && mkdir -p -m 0755 /etc/apt/keyrings \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
     && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
@@ -15,6 +24,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y gh \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install PowerShell from the Microsoft repository
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+      | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/microsoft-debian-bookworm-prod bookworm main" \
+      > /etc/apt/sources.list.d/microsoft.list \
+    && apt-get update \
+    && apt-get -y install --no-install-recommends powershell \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI from the official repository
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get -y install --no-install-recommends gh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://bws.bitwarden.com/install | sh
+
+RUN mkdir -p "$HOME/.config/Bitwarden CLI" \
+    && touch "$HOME/.config/Bitwarden CLI/data.json" \
+    && wget "https://vault.bitwarden.com/download/?app=cli&platform=linux" --quiet -O /tmp/bw.zip \
+    && unzip /tmp/bw.zip \
+    && mv -f ./bw /usr/local/bin/bw \
+    && rm -f /tmp/bw.zip
+
+# allow users to read the root home directory, which is required for devpods to work properly (setting github user info)
+RUN chmod a+rx /root
+
 
 # Configure passwordless sudo for this specific user
 ARG USERNAME=airflow
