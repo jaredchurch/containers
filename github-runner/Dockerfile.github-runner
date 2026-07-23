@@ -48,12 +48,12 @@ RUN chmod a+x /install_pwsh.sh && \
     cd /actions-runner && \
     /install_pwsh.sh
 
-USER ubuntu
-
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 COPY ./authorise_runner.ps1 /authorise_runner.ps1
+
+USER ubuntu
 
 ENTRYPOINT ["/entrypoint.sh"]
 
