@@ -1,0 +1,82 @@
+name: Build and Push GitHub Runner Image
+
+on:
+  push:
+    paths:
+      - 'github-runner/**'
+      - '.github/workflows/build-github-runner.yml'
+  workflow_dispatch:
+    inputs:
+      publish_version:
+        description: 'Also publish a version tag (v1, v2, ...)'
+        required: true
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/github-runner
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Print Dockerfile.github-runner to log
+        run: cat ./github-runner/Dockerfile.github-runner
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          BASE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          TAGS="$BASE:latest"
+          echo "version_tag=" >> "$GITHUB_OUTPUT"
+
+          SCOPE="repository:${{ env.IMAGE_NAME }}:pull"
+          AUTH_TOKEN=$(curl -s "https://${{ env.REGISTRY }}/token?service=${{ env.REGISTRY }}&scope=$SCOPE" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r '.token')
+          echo "Auth token obtained: ${AUTH_TOKEN:0:20}..."
+
+          RESPONSE=$(curl -s -H "Authorization: Bearer $AUTH_TOKEN" \
+            "https://${{ env.REGISTRY }}/v2/${{ env.IMAGE_NAME }}/tags/list")
+          echo "Raw API response: $RESPONSE"
+
+          MAX=$(echo "$RESPONSE" | jq -r '.tags // [] | map(select(test("^v\\d+$"))) | map(.[1:] | tonumber) | max // 0')
+          echo "Parsed max version number: $MAX"
+
+          SHOULD_VERSION="${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_version == 'true') }}"
+          NEW_TAG="v$((MAX + 1))"
+          echo "New Tag: $NEW_TAG, Should version: $SHOULD_VERSION"
+          if [[ "$SHOULD_VERSION" == "true" ]]; then
+            TAGS="$TAGS,$BASE:$NEW_TAG"
+            echo "version_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+            echo "Building github-runner image version: $NEW_TAG"
+          fi
+          echo "Tags to push: $TAGS"
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./github-runner
+          file: ./github-runner/Dockerfile.github-runner
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

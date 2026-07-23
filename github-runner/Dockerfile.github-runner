@@ -1,0 +1,63 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PUID=1000
+ENV PGID=1000
+
+ARG RUNNER_SHA256=4ef2f25285f0ae4477f1fe1e346db76d2f3ebf03824e2ddd1973a2819bf6c8cf
+ARG RUNNER_DOWNLOAD_URL=https://github.com/actions/runner/releases/download/v2.335.1/actions-runner-linux-x64-2.335.1.tar.gz
+ARG RUNNER_TGZ=/actions-runner/actions-runner.tar.gz
+
+RUN ln -fs /usr/share/zoneinfo/Pacific/Auckland /etc/localtime \
+    && echo "Pacific/Auckland" | tee /etc/timezone
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+	    jq \
+        curl \
+        libdigest-sha-perl \
+        wget \
+        apt-transport-https \
+        software-properties-common \
+        sudo \
+        python3-full \
+        pip && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p -m 755 /etc/apt/keyrings && \
+    wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /actions-runner && \
+    curl -o ${RUNNER_TGZ} -L ${RUNNER_DOWNLOAD_URL} && \
+    echo "${RUNNER_SHA256}  ${RUNNER_TGZ}" | shasum -a 256 -c && \
+    tar xzf ${RUNNER_TGZ} -C /actions-runner && \
+    cd /actions-runner && \
+    ./bin/installdependencies.sh && \
+    rm -f ${RUNNER_TGZ}
+
+RUN groupadd -g ${PGID} ubuntu && \
+    useradd -u ${PUID} -g ubuntu -m -s /bin/bash ubuntu && \
+    chown -R ubuntu:ubuntu /actions-runner && \
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+COPY ./install_pwsh.sh /install_pwsh.sh
+RUN chmod a+x /install_pwsh.sh && \
+    cd /actions-runner && \
+    /install_pwsh.sh
+
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+COPY ./authorise_runner.ps1 /authorise_runner.ps1
+
+USER ubuntu
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+### End of File
