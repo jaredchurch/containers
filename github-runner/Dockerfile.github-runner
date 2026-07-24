@@ -46,17 +46,22 @@ RUN groupadd -g ${PGID} ubuntu && \
     chown -R ubuntu:ubuntu /actions-runner && \
     echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-COPY ./install_pwsh.sh /install_pwsh.sh
-RUN chmod a+x /install_pwsh.sh && \
-    cd /actions-runner && \
-    /install_pwsh.sh
+RUN . /etc/os-release && \
+    MS_PKG_URL="https://packages.microsoft.com/config/${ID}/${VERSION_ID}/packages-microsoft-prod.deb" && \
+    wget -q "$MS_PKG_URL" && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm -f packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y powershell && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-COPY ./authorise_runner.ps1 /authorise_runner.ps1
-
 USER ubuntu
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD pgrep -f "Runner.Listener" > /dev/null || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
 
