@@ -52,7 +52,7 @@ register_runner() {
     fi
 
     # Get runner name from hostname and configure runner
-    RUNNER_NAME=$(hostname)
+    RUNNER_NAME=${HOSTNAME}
     CONFIG_URL="https://github.com/${GITHUB_ORG}"
 
     echo "[$(date)]: Registering runner: ${RUNNER_NAME}"
