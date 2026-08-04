@@ -23,7 +23,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  SOURCE_DATE_EPOCH: '1710000000'
 
 jobs:
   build-and-push:
@@ -88,63 +87,7 @@ jobs:
       - name: Lint Dockerfile
         run: docker buildx build --check --file ${{ inputs.dockerfile }} ${{ inputs.context }}
 
-      - name: Check for changes
-        id: changes
-        env:
-          IMAGE_NAME: ${{ github.repository_owner }}/${{ inputs.image_name }}
-        run: |
-          set -euo pipefail
-          ON_MAIN="${{ github.ref == 'refs/heads/main' }}"
-          DEV_ONLY="${{ inputs.dev_mode == true }}"
-          if [[ "$ON_MAIN" == "true" && "$DEV_ONLY" != "true" ]]; then
-            TARGET_TAG="latest"
-          else
-            TARGET_TAG="dev"
-          fi
-          echo "Comparing against published tag: $TARGET_TAG"
-
-          METADATA_FILE=/tmp/build-meta.json
-          OCI_FILE=/tmp/image.oci
-          docker buildx build \
-            --file ${{ inputs.dockerfile }} \
-            --provenance=false \
-            --sbom=false \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --metadata-file "$METADATA_FILE" \
-            --output "type=oci,dest=$OCI_FILE" \
-            ${{ inputs.context }}
-          NEW_DIGEST=$(tar -xOf "$OCI_FILE" index.json | jq -r '.manifests[0].digest')
-          echo "New image digest: $NEW_DIGEST"
-
-          SCOPE="repository:${IMAGE_NAME}:pull"
-          AUTH_TOKEN=$(curl -s "https://${{ env.REGISTRY }}/token?service=${{ env.REGISTRY }}&scope=$SCOPE" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r '.token')
-
-          MANIFEST_FILE=/tmp/published-manifest.json
-          HTTP_CODE=$(curl -s -o "$MANIFEST_FILE" -w "%{http_code}" \
-            -H "Authorization: Bearer $AUTH_TOKEN" \
-            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
-            "https://${{ env.REGISTRY }}/v2/${IMAGE_NAME}/manifests/$TARGET_TAG")
-
-          SKIP="false"
-          if [[ "$HTTP_CODE" == "200" ]]; then
-            if jq -e '.manifests' "$MANIFEST_FILE" >/dev/null 2>&1; then
-              PUBLISHED_AMD64=$(jq -r '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest' "$MANIFEST_FILE")
-            else
-              PUBLISHED_AMD64=$(sha256sum "$MANIFEST_FILE" | awk '{print "sha256:"$1}')
-            fi
-            echo "Published amd64 digest: $PUBLISHED_AMD64"
-            if [[ -n "$NEW_DIGEST" && "$NEW_DIGEST" == "$PUBLISHED_AMD64" ]]; then
-              SKIP="true"
-            fi
-          else
-            echo "Tag $TARGET_TAG not found (HTTP $HTTP_CODE); will push."
-          fi
-          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
-
       - name: Build and push Docker image
-        if: steps.changes.outputs.skip != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: ${{ inputs.context }}
@@ -159,10 +102,6 @@ jobs:
         run: |
           echo "## 🐳 GHCR Tags" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          if [ "${{ steps.changes.outputs.skip }}" == "true" ]; then
-            echo "**Push skipped:** image content unchanged (digest matches published tag)." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
           IFS=',' read -ra TAG_ARRAY <<< "${{ steps.tags.outputs.tags }}"
           for tag in "${TAG_ARRAY[@]}"; do
             echo "- \`${tag}\`" >> "$GITHUB_STEP_SUMMARY"

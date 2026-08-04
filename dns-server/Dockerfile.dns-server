@@ -6,9 +6,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bind9 \
     dnsutils \
-&& rm -rf /var/lib/apt/lists/* \
-&& rm -rf /var/log/apt /var/log/dpkg.log \
-&& rm -f /var/cache/ldconfig/aux-cache /etc/bind/rndc.key
+&& rm -rf /var/lib/apt/lists/*
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
   CMD dig @localhost . SOA +norecurse || exit 1
