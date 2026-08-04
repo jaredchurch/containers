@@ -7,9 +7,9 @@ on:
       - '.github/workflows/build-airflow.yml'
   workflow_dispatch:
     inputs:
-      publish_version:
-        description: 'Also publish a version tag (v1, v2, ...)'
-        required: true
+      dev_mode:
+        description: 'Build as dev image only (dev tag) even on the main branch'
+        required: false
         default: false
         type: boolean
 
@@ -20,4 +20,5 @@ jobs:
       image_name: airflow
       context: ./airflow-image
       dockerfile: ./airflow-image/Dockerfile.airflow
+      dev_mode: ${{ inputs.dev_mode || false }}
     secrets: inherit

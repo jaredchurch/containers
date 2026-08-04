@@ -7,9 +7,9 @@ on:
       - '.github/workflows/build-github-runner.yml'
   workflow_dispatch:
     inputs:
-      publish_version:
-        description: 'Also publish a version tag (v1, v2, ...)'
-        required: true
+      dev_mode:
+        description: 'Build as dev image only (dev tag) even on the main branch'
+        required: false
         default: false
         type: boolean
 
@@ -20,4 +20,5 @@ jobs:
       image_name: github-runner
       context: ./github-runner
       dockerfile: ./github-runner/Dockerfile.github-runner
+      dev_mode: ${{ inputs.dev_mode || false }}
     secrets: inherit

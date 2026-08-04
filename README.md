@@ -15,6 +15,11 @@ Dev Container configuration and Docker base-image factory for Python 3.10 + Node
 │   └── build-base.yml             # CI: builds & pushes base image to GHCR
 ├── base-image/
 │   └── Dockerfile.base            # Custom base image (Python 3.10 + Node.js)
+├── dns-server/
+│   └── Dockerfile                 # BIND9 DNS server
+├── github-runner/
+│   ├── Dockerfile.github-runner   # GitHub Actions runner (with PowerShell)
+│   └── entrypoint.sh
 ├── scripts/
 │   └── build.sh                   # Helper to build any Dockerfile in the repo
 ├── AGENTS.md                      # Instructions for AI coding agents
