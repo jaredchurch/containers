@@ -1,10 +1,10 @@
-name: Build and Push GitHub Runner Image
+name: Build and Push DNS Server Image
 
 on:
   push:
     paths:
-      - 'github-runner/**'
-      - '.github/workflows/build-github-runner.yml'
+      - 'dns-server/**'
+      - '.github/workflows/build-dns-server.yml'
   workflow_dispatch:
     inputs:
       publish_version:
@@ -17,7 +17,7 @@ jobs:
   build:
     uses: ./.github/workflows/_build-container-dev.yml
     with:
-      image_name: github-runner
-      context: ./github-runner
-      dockerfile: ./github-runner/Dockerfile.github-runner
+      image_name: dns-server
+      context: ./dns-server
+      dockerfile: ./dns-server/Dockerfile
     secrets: inherit
