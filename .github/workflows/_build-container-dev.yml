@@ -104,6 +104,7 @@ jobs:
           echo "Comparing against published tag: $TARGET_TAG"
 
           METADATA_FILE=/tmp/build-meta.json
+          OCI_FILE=/tmp/image.oci
           docker buildx build \
             --file ${{ inputs.dockerfile }} \
             --provenance=false \
@@ -111,8 +112,9 @@ jobs:
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --metadata-file "$METADATA_FILE" \
+            --output "type=oci,dest=$OCI_FILE" \
             ${{ inputs.context }}
-          NEW_DIGEST=$(jq -r '."containerimage.digest"' "$METADATA_FILE")
+          NEW_DIGEST=$(tar -xOf "$OCI_FILE" index.json | jq -r '.manifests[0].digest')
           echo "New image digest: $NEW_DIGEST"
 
           SCOPE="repository:${IMAGE_NAME}:pull"
