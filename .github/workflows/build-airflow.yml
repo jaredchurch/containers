@@ -20,5 +20,5 @@ jobs:
       image_name: airflow
       context: ./airflow-image
       dockerfile: ./airflow-image/Dockerfile.airflow
-      dev_mode: ${{ inputs.dev_mode || false }}
+      dev_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.dev_mode }}
     secrets: inherit
