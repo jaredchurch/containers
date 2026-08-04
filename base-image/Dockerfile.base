@@ -1,6 +1,9 @@
 # Use the official Python 3.10 image built on Debian Trixie Slim
 FROM mcr.microsoft.com/devcontainers/python:3.10-trixie
 
+LABEL org.opencontainers.image.source="https://github.com/jaredchurch/containers"
+LABEL org.opencontainers.image.licenses="MIT"
+
 # Prevent Python from writing .pyc files to disk
 ENV PYTHONDONTWRITEBYTECODE=1
 

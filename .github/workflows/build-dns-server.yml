@@ -15,10 +15,13 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_build-container-dev.yml
     with:
       image_name: dns-server
       context: ./dns-server
-      dockerfile: ./dns-server/Dockerfile
-      dev_mode: ${{ inputs.dev_mode || false }}
+      dockerfile: ./dns-server/Dockerfile.dns-server
+      dev_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.dev_mode }}
     secrets: inherit

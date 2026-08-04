@@ -1,5 +1,8 @@
 FROM apache/airflow:3.3.0-python3.11
 
+LABEL org.opencontainers.image.source="https://github.com/jaredchurch/containers"
+LABEL org.opencontainers.image.licenses="MIT"
+
 USER root
 
 # Install git, GitHub CLI dependencies, and curl cleanly as root
