@@ -1,47 +1,53 @@
 # containers
 
-Dev Container configuration and Docker base-image factory for Python 3.10 + Node.js development environments with [OpenCode AI](https://opencode.ai).
+Docker images published to the GitHub Container Registry (GHCR), built and versioned by GitHub Actions.
 
-## Repository Structure
+## How this repo works
 
-```
-.
-├── .devcontainer/
-│   ├── devcontainer.json          # Dev Container definition (Ubuntu 24.04)
-│   └── features/opencode/
-│       ├── devcontainer-feature.json  # OpenCode feature metadata
-│       └── install.sh                 # Installs opencode-ai via npm
-├── .github/workflows/
-│   └── build-base.yml             # CI: builds & pushes base image to GHCR
-├── base-image/
-│   └── Dockerfile.base            # Custom base image (Python 3.10 + Node.js)
-├── scripts/
-│   └── build.sh                   # Helper to build any Dockerfile in the repo
-├── AGENTS.md                      # Instructions for AI coding agents
-└── README.md
-```
+Every image lives in its own directory and follows the same pattern:
 
-## Getting Started
+- A `Dockerfile.<name>` (e.g. `Dockerfile.base`, `Dockerfile.airflow`) defines the image.
+- A thin workflow `build-<name>.yml` calls the shared reusable workflow `_build-container-dev.yml`, passing the image name, build context, and Dockerfile path.
 
-Open this repository in VS Code with the Dev Containers extension (or in GitHub Codespaces). The dev container will:
+The reusable workflow handles login, tag generation, and the build/push for every image, so the per-image workflows stay tiny.
 
-- Start from `mcr.microsoft.com/devcontainers/base:ubuntu-24.04`
-- Install the `opencode-ai` CLI tool globally
-- Add the Docker VS Code extension
+## Build & publish model
 
-## Base Image
+Each image is built and pushed on every push that touches its directory or its workflow, and can also be triggered manually.
 
-[`base-image/Dockerfile.base`](base-image/Dockerfile.base) defines a reusable image based on `python:3.10-slim-trixie` with Node.js and npm installed. Use it as a base for downstream Dockerfiles:
+| Trigger | Branch | Tags pushed |
+| --- | --- | --- |
+| Push | any branch except `main` | `dev` |
+| Push | `main` | `latest` + `vN` (next version) |
+| Manual dispatch | any | `dev` by default; check **`dev_mode`** to force dev-only even on `main` |
 
-```dockerfile
-FROM ghcr.io/<owner>/base:latest
-```
+Version tags are auto-incremented from the highest existing `vN` tag on the package.
 
-## CI/CD
+## Adding a new image
 
-The [`build-base.yml`](.github/workflows/build-base.yml) workflow automatically builds and pushes the base image to the GitHub Container Registry on every push to `main` that touches `base-image/` or the workflow itself. Published as `ghcr.io/<owner>/base:latest`.
+1. Create a directory with a `Dockerfile.<name>`.
+2. Add a `build-<name>.yml` workflow that calls the reusable workflow:
 
-## Local Build
+   ```yaml
+   jobs:
+     build:
+       permissions:
+         contents: read
+         packages: write
+       uses: ./.github/workflows/_build-container-dev.yml
+       with:
+         image_name: <name>
+         context: ./<name>
+         dockerfile: ./<name>/Dockerfile.<name>
+         dev_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.dev_mode }}
+       secrets: inherit
+   ```
+
+3. Push the branch; the `dev` tag is published automatically. Merging to `main` publishes `latest` + the next `vN`.
+
+For first-time publishing, grant the repository write access on the package: **Package settings → Manage Actions access → add this repository with the Write role.**
+
+## Building locally
 
 Use the build helper to build any Dockerfile in the repo:
 
@@ -52,6 +58,10 @@ Use the build helper to build any Dockerfile in the repo:
 
 See `./scripts/build.sh --help` for details.
 
-## AI Agent Instructions
+## Dev container
+
+Open this repository in VS Code with the Dev Containers extension or in GitHub Codespaces. The dev container installs the `opencode-ai` CLI and the Docker VS Code extension.
+
+## AI agent instructions
 
 See [`AGENTS.md`](AGENTS.md) for instructions used by AI coding assistants working in this repository.
