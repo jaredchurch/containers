@@ -1,0 +1,27 @@
+name: Build and Push Print Server Image
+
+on:
+  push:
+    paths:
+      - 'printserver/**'
+      - '.github/workflows/build-printserver.yml'
+  workflow_dispatch:
+    inputs:
+      dev_mode:
+        description: 'Build as dev image only (dev tag) even on the main branch'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_build-container-dev.yml
+    with:
+      image_name: printserver
+      context: ./printserver
+      dockerfile: ./printserver/Dockerfile.printserver
+      dev_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.dev_mode }}
+    secrets: inherit

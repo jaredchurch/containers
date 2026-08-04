@@ -20,6 +20,9 @@ Dev Container configuration and Docker base-image factory for Python 3.10 + Node
 ├── github-runner/
 │   ├── Dockerfile.github-runner   # GitHub Actions runner (with PowerShell)
 │   └── entrypoint.sh
+├── printserver/
+│   ├── Dockerfile                 # CUPS AirPrint print server
+│   └── entrypoint.sh
 ├── scripts/
 │   └── build.sh                   # Helper to build any Dockerfile in the repo
 ├── AGENTS.md                      # Instructions for AI coding agents
