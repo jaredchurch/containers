@@ -58,6 +58,13 @@ Use the build helper to build any Dockerfile in the repo:
 
 See `./scripts/build.sh --help` for details.
 
+To lint Dockerfiles with [hadolint](https://github.com/hadolint/hadolint) (running via Docker if not installed locally):
+
+```sh
+./scripts/lint.sh                       # all Dockerfiles
+./scripts/lint.sh base-image/Dockerfile.base
+```
+
 ## Dev container
 
 Open this repository in VS Code with the Dev Containers extension or in GitHub Codespaces. The dev container installs the `opencode-ai` CLI and the Docker VS Code extension.
