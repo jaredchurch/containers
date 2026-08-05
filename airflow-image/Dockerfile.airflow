@@ -3,9 +3,12 @@ FROM apache/airflow:3.3.0-python3.11
 LABEL org.opencontainers.image.source="https://github.com/jaredchurch/containers"
 LABEL org.opencontainers.image.licenses="MIT"
 
-USER root
+USER 0
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Install git, GitHub CLI dependencies, and curl cleanly as root
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -21,16 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
     jq \
     less \
-    && mkdir -p -m 0755 /etc/apt/keyrings \
+    && install -d -m 0755 /etc/apt/keyrings \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
     && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
     && apt-get update \
-    && apt-get install -y gh \
+    && apt-get install -y --no-install-recommends gh \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PowerShell from the Microsoft repository
+# hadolint ignore=DL3008
 RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
       | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/microsoft-debian-bookworm-prod bookworm main" \
@@ -41,6 +45,7 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI from the official repository
+# hadolint ignore=DL3008
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
@@ -54,7 +59,7 @@ RUN curl https://bws.bitwarden.com/install | sh
 
 RUN mkdir -p "$HOME/.config/Bitwarden CLI" \
     && touch "$HOME/.config/Bitwarden CLI/data.json" \
-    && wget "https://vault.bitwarden.com/download/?app=cli&platform=linux" --quiet -O /tmp/bw.zip \
+    && curl -fsSL "https://vault.bitwarden.com/download/?app=cli&platform=linux" -o /tmp/bw.zip \
     && unzip /tmp/bw.zip \
     && mv -f ./bw /usr/local/bin/bw \
     && rm -f /tmp/bw.zip
@@ -64,12 +69,12 @@ RUN chmod a+rx /root
 
 
 # Configure passwordless sudo for this specific user
-ARG USERNAME=airflow
-RUN usermod -aG sudo $USERNAME \
-    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+ARG AIRFLOW_USER=airflow
+RUN usermod -aG sudo $AIRFLOW_USER \
+    && echo "$AIRFLOW_USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$AIRFLOW_USER \
+    && chmod 0440 /etc/sudoers.d/$AIRFLOW_USER
 
 # Switch back to the standard non-root user that Airflow expects
-USER $USERNAME
+USER $AIRFLOW_USER
 
 ### End of File

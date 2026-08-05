@@ -12,8 +12,9 @@ LABEL org.opencontainers.image.licenses=MIT
 
 # Install dependencies
 # RUN apt-get update -qq  && apt-get upgrade -qqy \
+# hadolint ignore=DL3008
 RUN apt-get update -qq \
-    && apt-get install -qqy \
+    && apt-get install -qqy --no-install-recommends \
     apt-utils \
     usbutils \
     cups \

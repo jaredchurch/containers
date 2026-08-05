@@ -9,9 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 # Prevent Python from buffering stdout and stderr
 ENV PYTHONUNBUFFERED=1
-
 ENV DEBIAN_FRONTEND=noninteractive
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get -y install --no-install-recommends \
       nodejs \
       npm \
@@ -29,6 +31,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
 
 
 # Install PowerShell from the Microsoft repository
+# hadolint ignore=DL3008
 RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
       | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/microsoft-debian-bookworm-prod bookworm main" \
@@ -39,6 +42,7 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI from the official repository
+# hadolint ignore=DL3008
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
       | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
@@ -52,7 +56,7 @@ RUN curl https://bws.bitwarden.com/install | sh
 
 RUN mkdir -p "$HOME/.config/Bitwarden CLI" \
     && touch "$HOME/.config/Bitwarden CLI/data.json" \
-    && wget "https://vault.bitwarden.com/download/?app=cli&platform=linux" --quiet -O /tmp/bw.zip \
+    && curl -fsSL "https://vault.bitwarden.com/download/?app=cli&platform=linux" -o /tmp/bw.zip \
     && unzip /tmp/bw.zip \
     && mv -f ./bw /usr/local/bin/bw \
     && rm -f /tmp/bw.zip
@@ -64,7 +68,7 @@ RUN chmod a+rx /root
 RUN usermod -aG sudo vscode && \
     echo "vscode ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-USER vscode
+USER 1000
 
 
 ### End of File
