@@ -72,8 +72,10 @@ RUN mkdir -p /etc/containerd \
     && containerd config default > /etc/containerd/config.toml \
     && sed -i 's/^disabled_plugins = \[\]/disabled_plugins = ["io.containerd.snapshotter.v1.erofs"]/' /etc/containerd/config.toml
 
-# Allow the devcontainer user to talk to the Docker daemon
-RUN if ! grep -q "^docker:" /etc/group; then groupadd -r docker; fi \
+# Allow the devcontainer user to talk to the Docker daemon.
+# Pin the docker group GID to 1001 so it matches the host docker group
+# (and any group-mapped mounts) reliably.
+RUN if ! grep -q "^docker:" /etc/group; then groupadd -g 1001 docker; fi \
     && usermod -aG docker vscode
 
 # docker-init.sh starts dockerd (and containerd) and is picked up automatically
