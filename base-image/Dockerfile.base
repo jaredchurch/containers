@@ -81,7 +81,6 @@ RUN if grep -q "^docker:" /etc/group; then \
         groupadd -g 1001 docker; \
     fi \
     && usermod -aG docker vscode \
-    && grep -q "^docker:" /etc/group \
     && id vscode
 
 # docker-init.sh starts dockerd (and containerd) and is picked up automatically
