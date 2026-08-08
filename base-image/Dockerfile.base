@@ -75,7 +75,11 @@ RUN mkdir -p /etc/containerd \
 # Allow the devcontainer user to talk to the Docker daemon.
 # Pin the docker group GID to 1001 so it matches the host docker group
 # (and any group-mapped mounts) reliably.
-RUN if ! grep -q "^docker:" /etc/group; then groupadd -g 1001 docker; fi \
+RUN if grep -q "^docker:" /etc/group; then \
+        groupmod -g 1001 docker; \
+    else \
+        groupadd -g 1001 docker; \
+    fi \
     && usermod -aG docker vscode
 
 # docker-init.sh starts dockerd (and containerd) and is picked up automatically
