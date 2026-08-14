@@ -18,8 +18,9 @@
 
 FROM postgres:18.6 AS builder
 
-# pg_lake has no git tags; pin the commit (bump by updating this + the clone).
-ARG PGLAKE_COMMIT=8453de3
+# pg_lake has no git tags; pin the full commit SHA (a short SHA can't be
+# fetched by a fresh shallow clone). Bump by updating this + the clone below.
+ARG PGLAKE_COMMIT=8453de352eee76088202c68a2b43bce3f4d75e8e
 ARG VCPKG_VERSION=2025.10.17
 ARG CMAKE_VERSION=3.31.1
 
