@@ -136,7 +136,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # btree_gist is required by pg_lake_table; ca-certificates was pruned from the
 # base image and gives libcurl/httpfs a CA bundle for any HTTPS calls;
-# libcurl4/libsnappy1v5/libgomp1 back the extension .so files; libnuma1,
+# libcurl4/libsnappy1v5/libgomp1/libjansson4 back the extension .so files; libnuma1,
 # libpam0g/libselinux1/libxslt1.1 back pgduck_server's dynamic dependencies
 # that postgresql-18 doesn't pull in on its own.
 RUN set -eux; \
@@ -147,6 +147,7 @@ RUN set -eux; \
         libcurl4 \
         libsnappy1v5 \
         libgomp1 \
+        libjansson4 \
         libnuma1 \
         libpam0g \
         libselinux1 \
