@@ -55,6 +55,7 @@ RUN set -eux; \
         liblzma-dev \
         libsnappy-dev \
         libjson-c-dev \
+        libjansson-dev \
         postgresql-server-dev-18 \
     ; \
     rm -rf /var/lib/apt/lists/*
@@ -114,7 +115,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 ENV DEBIAN_FRONTEND=noninteractive
 
 # btree_gist is required by pg_lake_table; ca-certificates was pruned from the
-# base image and is needed for pg_lake's HTTPS calls + the CA trust store;
+# base image and gives libcurl/httpfs a CA bundle for any HTTPS calls;
 # libcurl4/libsnappy1v5/libgomp1 back the extension .so files.
 RUN set -eux; \
     apt-get update; \
