@@ -106,16 +106,19 @@ ENV VCPKG_TOOLCHAIN_PATH=/usr/local/src/vcpkg/scripts/buildsystems/vcpkg.cmake
 # (libduckdb + the pgduck_server binary), all installed into the PG dirs of the
 # postgresql-server-dev-18 prefix (/usr/lib/postgresql/18).
 WORKDIR /usr/local/src/pg_lake
-# pgduck_server's Makefile links -lpgcommon/-lpgport via -L$(pg_config --libdir),
-# but Debian ships those static libs in the *pkglibdir* (and pg_config --libdir
-# here is the multiarch dir). Override PG_LDFLAGS to search both. libduckdb.so
-# and libavro.so are installed into --libdir by the pg_lake Makefiles, so copy
-# them into the pkglibdir for the runtime stage's COPY below.
+# install-fast = install-pg_lake then install-pgduck_server. We split them up:
+# the PG_LDFLAGS override is only meant for the pgduck_server link (Debian
+# keeps libpgcommon/libpgport in the *pkglibdir*, while pg_config --libdir here
+# is the multiarch dir), but as a command-line variable it would also leak into
+# every extension's shlib link. libduckdb.so and libavro.so are installed into
+# --libdir by the pg_lake Makefiles, so copy them into the pkglibdir for the
+# runtime stage's COPY below.
 RUN set -eux; \
     PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config; \
     PG_LIBDIR=$($PG_CONFIG --libdir); \
     PG_PKGLIBDIR=$($PG_CONFIG --pkglibdir); \
-    make install-fast PG_CONFIG=$PG_CONFIG \
+    make install-pg_lake PG_CONFIG=$PG_CONFIG; \
+    DUCKDB_BUILD_USE_CACHE=1 make install-pgduck_server PG_CONFIG=$PG_CONFIG \
         PG_LDFLAGS="-lduckdb -L${PG_PKGLIBDIR} -Wl,-rpath,${PG_PKGLIBDIR} -L${PG_LIBDIR} -Wl,-rpath,${PG_LIBDIR}"; \
     cp -a "$PG_LIBDIR"/libduckdb.so "$PG_PKGLIBDIR/"; \
     cp -a "$PG_LIBDIR"/libavro.so.* "$PG_PKGLIBDIR/"
