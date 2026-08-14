@@ -53,6 +53,7 @@ RUN set -eux; \
         zlib1g-dev \
         liblz4-dev \
         liblzma-dev \
+        libnuma-dev \
         libpam0g-dev \
         libreadline-dev \
         libselinux1-dev \
