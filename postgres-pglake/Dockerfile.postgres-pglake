@@ -56,6 +56,7 @@ RUN set -eux; \
         libsnappy-dev \
         libjson-c-dev \
         libjansson-dev \
+        libicu-dev \
         postgresql-server-dev-18 \
     ; \
     rm -rf /var/lib/apt/lists/*
