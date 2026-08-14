@@ -53,7 +53,11 @@ RUN set -eux; \
         zlib1g-dev \
         liblz4-dev \
         liblzma-dev \
+        libpam0g-dev \
+        libreadline-dev \
+        libselinux1-dev \
         libsnappy-dev \
+        libxslt1-dev \
         libjson-c-dev \
         libjansson-dev \
         libicu-dev \
@@ -102,8 +106,19 @@ ENV VCPKG_TOOLCHAIN_PATH=/usr/local/src/vcpkg/scripts/buildsystems/vcpkg.cmake
 # (libduckdb + the pgduck_server binary), all installed into the PG dirs of the
 # postgresql-server-dev-18 prefix (/usr/lib/postgresql/18).
 WORKDIR /usr/local/src/pg_lake
+# pgduck_server's Makefile links -lpgcommon/-lpgport via -L$(pg_config --libdir),
+# but Debian ships those static libs in the *pkglibdir* (and pg_config --libdir
+# here is the multiarch dir). Override PG_LDFLAGS to search both. libduckdb.so
+# and libavro.so are installed into --libdir by the pg_lake Makefiles, so copy
+# them into the pkglibdir for the runtime stage's COPY below.
 RUN set -eux; \
-    make install-fast PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config
+    PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config; \
+    PG_LIBDIR=$($PG_CONFIG --libdir); \
+    PG_PKGLIBDIR=$($PG_CONFIG --pkglibdir); \
+    make install-fast PG_CONFIG=$PG_CONFIG \
+        PG_LDFLAGS="-lduckdb -L${PG_PKGLIBDIR} -Wl,-rpath,${PG_PKGLIBDIR} -L${PG_LIBDIR} -Wl,-rpath,${PG_LIBDIR}"; \
+    cp -a "$PG_LIBDIR"/libduckdb.so "$PG_PKGLIBDIR/"; \
+    cp -a "$PG_LIBDIR"/libavro.so.* "$PG_PKGLIBDIR/"
 
 # ============================================================================
 # Runtime
@@ -117,7 +132,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # btree_gist is required by pg_lake_table; ca-certificates was pruned from the
 # base image and gives libcurl/httpfs a CA bundle for any HTTPS calls;
-# libcurl4/libsnappy1v5/libgomp1 back the extension .so files.
+# libcurl4/libsnappy1v5/libgomp1 back the extension .so files; libnuma1,
+# libpam0g/libselinux1/libxslt1.1 back pgduck_server's dynamic dependencies
+# that postgresql-18 doesn't pull in on its own.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -126,6 +143,10 @@ RUN set -eux; \
         libcurl4 \
         libsnappy1v5 \
         libgomp1 \
+        libnuma1 \
+        libpam0g \
+        libselinux1 \
+        libxslt1.1 \
     ; \
     rm -rf /var/lib/apt/lists/*
 
@@ -134,8 +155,11 @@ COPY --from=builder /usr/lib/postgresql/18/lib/          /usr/lib/postgresql/18/
 COPY --from=builder /usr/share/postgresql/18/extension/  /usr/share/postgresql/18/extension/
 COPY --from=builder /usr/lib/postgresql/18/bin/pgduck_server /usr/lib/postgresql/18/bin/
 
-# Fail the build if any shared-library dependency is unresolved.
+# Register the pg pkglibdir with the loader (Debian doesn't add it for us),
+# then fail the build if any shared-library dependency is unresolved.
 RUN set -eux; \
+    echo "/usr/lib/postgresql/18/lib" > /etc/ld.so.conf.d/postgresql-pglake.conf; \
+    ldconfig; \
     ! ldd /usr/lib/postgresql/18/lib/*.so /usr/lib/postgresql/18/bin/pgduck_server 2>/dev/null | grep "not found"
 
 # Start pgduck_server alongside the official entrypoint (it must share the
