@@ -164,8 +164,18 @@ COPY --from=builder /usr/lib/postgresql/18/bin/pgduck_server /usr/lib/postgresql
 # pg_lake CASCADE aborts. The official entrypoint offers no config hook before
 # the server starts, but initdb derives postgresql.conf from
 # postgresql.conf.sample, so inject it there.
+#
+# pg_lake_iceberg.enable_object_store_catalog = off: this image talks to a
+# Polaris REST catalog, not pg_lake's own object-store catalog (catalog=
+# 'object_store'), so turn it off. Left on, the pg_lake autovacuum worker
+# re-exports that catalog every second and, because
+# object_store_catalog_location_prefix is unset, logs "WARNING:
+# pg_lake_iceberg.object_store_catalog_location_prefix is not set" once per
+# second per database. Setting it here stops that spam on fresh volumes.
 RUN set -eux; \
     echo "shared_preload_libraries = 'pg_extension_base'" \
+        >> /usr/share/postgresql/18/postgresql.conf.sample; \
+    echo "pg_lake_iceberg.enable_object_store_catalog = off" \
         >> /usr/share/postgresql/18/postgresql.conf.sample
 
 # Register the pg pkglibdir with the loader (Debian doesn't add it for us),

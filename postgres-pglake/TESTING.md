@@ -126,8 +126,9 @@ docker run --rm --entrypoint cat \
   /usr/share/postgresql/18/postgresql.conf.sample \
   > /tmp/pglake.conf.sample
 
-# 2. Append the line the Dockerfile now adds
+# 2. Append the lines the Dockerfile now adds
 echo "shared_preload_libraries = 'pg_extension_base'" >> /tmp/pglake.conf.sample
+echo "pg_lake_iceberg.enable_object_store_catalog = off" >> /tmp/pglake.conf.sample
 tail -3 /tmp/pglake.conf.sample
 
 # 3. Run with the modified sample mounted over the image's copy
