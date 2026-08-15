@@ -160,6 +160,14 @@ COPY --from=builder /usr/lib/postgresql/18/lib/          /usr/lib/postgresql/18/
 COPY --from=builder /usr/share/postgresql/18/extension/  /usr/share/postgresql/18/extension/
 COPY --from=builder /usr/lib/postgresql/18/bin/pgduck_server /usr/lib/postgresql/18/bin/
 
+# pg_extension_base must be in shared_preload_libraries or CREATE EXTENSION
+# pg_lake CASCADE aborts. The official entrypoint offers no config hook before
+# the server starts, but initdb derives postgresql.conf from
+# postgresql.conf.sample, so inject it there.
+RUN set -eux; \
+    echo "shared_preload_libraries = 'pg_extension_base'" \
+        >> /usr/share/postgresql/18/postgresql.conf.sample
+
 # Register the pg pkglibdir with the loader (Debian doesn't add it for us),
 # then fail the build if any shared-library dependency is unresolved.
 RUN set -eux; \
