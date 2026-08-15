@@ -12,14 +12,15 @@ It is a standard PostgreSQL image, so test it like any Postgres container.
 
 ```bash
 docker pull ghcr.io/jaredchurch/postgres-pglake:dev   # login first if repo is private
-docker rm pglake-test
-docker run -d --name pglake-test   -e POSTGRES_PASSWORD=test   ghcr.io/jaredchurch/postgres-pglake:dev
+docker rm -f pglake-test
+docker run -d --name pglake-test -e POSTGRES_PASSWORD=test ghcr.io/jaredchurch/postgres-pglake:dev
 ```
 
 ## 2. Confirm the container is alive
 
 ```bash
-docker ps -a   # pglake-test should be Up; note the exit code if not
+docker ps -a | grep pglake-test    # pglake-test should be Up - note the exit code if not
+echo $?
 ```
 
 ## 3. Confirm pgduck_server started
@@ -48,24 +49,35 @@ docker exec pglake-test psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS pg_l
 docker exec pglake-test psql -U postgres -c "\dx pg_lake*"
 ```
 
-## 5. Exercise DuckDB through Postgres
+## 5. Exercise DuckDB (pgduck_server)
 
-```sql
-SELECT * FROM duckdb_execute('SELECT version();') AS (version TEXT);
-```
+pg_lake does **not** provide a `duckdb_execute()` SQL function — that was a
+`pg_duckdb` API and errors with `function duckdb_execute(unknown) does not exist`.
+pg_lake sends queries to `pgduck_server` over its unix socket instead, so run
+DuckDB SQL directly against that server (the exact socket the extensions use):
 
-```sql
-CREATE TABLE t AS
-SELECT * FROM duckdb_execute('SELECT 42 AS answer, md5(''x'') AS h')
-  AS (answer int, h text);
+```bash
+docker exec pglake-test psql -U postgres -h /tmp -p 5332 -c "SELECT version();"
 ```
 
 Quick sanity check:
 
 ```bash
-docker exec pglake-test psql -U postgres -c "SELECT * FROM duckdb_execute('SELECT 1+1 AS x') AS r(x int);"
+docker exec pglake-test psql -U postgres -h /tmp -p 5332 -c "SELECT 1+1 AS x;"
 # -> x
 # -> 2
+```
+
+The end-to-end pg_lake check through Postgres is an Iceberg table round-trip.
+This needs the S3 endpoint and `pg_lake_iceberg.default_location_prefix`
+configured (see `docker-entrypoint-pgduck.sh`); otherwise `CREATE TABLE`
+fails with `"location" option is required for pg_lake_iceberg tables`:
+
+```sql
+CREATE TABLE t(a int) USING iceberg;
+INSERT INTO t VALUES (1),(2);
+SELECT sum(a) FROM t;
+DROP TABLE t;
 ```
 
 ## Troubleshooting: container exits immediately
@@ -132,7 +144,7 @@ docker logs -f pglake-test
 # 5. Verify once it is up
 docker exec pglake-test psql -U postgres -c "SHOW shared_preload_libraries;"
 docker exec pglake-test psql -U postgres -c "SELECT extname FROM pg_extension ORDER BY 1;"
-docker exec pglake-test psql -U postgres -c "SELECT * FROM duckdb_execute('SELECT version()') AS v(version text);"
+docker exec pglake-test psql -U postgres -h /tmp -p 5332 -c "SELECT version() AS duckdb_version;"
 ```
 
 Note: the CI workflow uses `cache-from/cache-to: type=gha`, so the next build
