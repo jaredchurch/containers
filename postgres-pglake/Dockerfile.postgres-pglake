@@ -1,0 +1,188 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================================
+# postgres-pglake — PostgreSQL 18 with pg_lake (Snowflake-Labs) for the
+# data-warehouse.
+#
+# pg_lake is three pieces that must live together on the same host:
+#   1. PostgreSQL extensions   (pg_lake, pg_lake_iceberg, ...)
+#   2. libduckdb.so            (embedded DuckDB engine)
+#   3. pgduck_server           (a DuckDB process speaking the PG wire protocol;
+#                               the extensions reach it over a unix socket)
+#
+# NOTE on the base image: PostgreSQL 18 refuses to dlopen a module compiled
+# against a different *minor* version, and apt.postgresql.org only carries the
+# current minor's server-dev package. Both stages must therefore use the same
+# `postgres:` tag as the pinned pgdg release. If you bump the tag, rebuild.
+# ============================================================================
+
+FROM postgres:18.6 AS builder
+
+# pg_lake has no git tags; pin the full commit SHA (a short SHA can't be
+# fetched by a fresh shallow clone). Bump by updating this + the clone below.
+ARG PGLAKE_COMMIT=8453de352eee76088202c68a2b43bce3f4d75e8e
+ARG VCPKG_VERSION=2025.10.17
+ARG CMAKE_VERSION=3.31.1
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- Build dependencies -----------------------------------------------------
+# postgresql-server-dev-18 provides pg_config + headers matching the runtime
+# image exactly (same pgdg repo the base image already configures). The rest
+# is for vcpkg / DuckDB / avro.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        g++ \
+        ninja-build \
+        flex \
+        bison \
+        pkg-config \
+        git \
+        curl \
+        ca-certificates \
+        unzip \
+        zip \
+        patch \
+        perl \
+        python3 \
+        libtool \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        zlib1g-dev \
+        liblz4-dev \
+        liblzma-dev \
+        libnuma-dev \
+        libpam0g-dev \
+        libreadline-dev \
+        libselinux1-dev \
+        libsnappy-dev \
+        libxslt1-dev \
+        libjson-c-dev \
+        libjansson-dev \
+        libicu-dev \
+        postgresql-server-dev-18 \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+# --- cmake (vcpkg requires newer than Debian ships) -------------------------
+RUN set -eux; \
+    arch=$(uname -m); \
+    case "$arch" in \
+        x86_64)  cm_arch=x86_64 ;; \
+        aarch64) cm_arch=aarch64 ;; \
+        *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/cmake.tar.gz \
+        "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-${cm_arch}.tar.gz"; \
+    mkdir -p /opt/cmake; \
+    tar -xzf /tmp/cmake.tar.gz --strip-components=1 -C /opt/cmake; \
+    rm /tmp/cmake.tar.gz
+ENV PATH=/opt/cmake/bin:${PATH}
+
+# --- pg_lake source (pinned commit) -----------------------------------------
+RUN set -eux; \
+    git clone --recurse-submodules --depth 1 \
+        https://github.com/Snowflake-Labs/pg_lake.git /usr/local/src/pg_lake; \
+    cd /usr/local/src/pg_lake; \
+    git fetch --depth 1 origin "$PGLAKE_COMMIT"; \
+    git checkout "$PGLAKE_COMMIT"; \
+    git submodule update --init --recursive --depth 1
+
+# --- vcpkg + Azure SDK (Azure storage/identity used by libduckdb) -----------
+# This is the long pole of the build (azure-sdk-for-cpp + aws-sdk-cpp are
+# compiled from source).
+RUN set -eux; \
+    git clone --depth 1 --branch "$VCPKG_VERSION" \
+        https://github.com/microsoft/vcpkg.git /usr/local/src/vcpkg; \
+    cd /usr/local/src/vcpkg; \
+    ./bootstrap-vcpkg.sh; \
+    ./vcpkg install azure-identity-cpp azure-storage-blobs-cpp \
+                  azure-storage-files-datalake-cpp openssl
+ENV VCPKG_TOOLCHAIN_PATH=/usr/local/src/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+# --- Build + install pg_lake, libduckdb and pgduck_server -------------------
+# install-fast = install-pg_lake (extensions + libavro) then install-pgduck_server
+# (libduckdb + the pgduck_server binary), all installed into the PG dirs of the
+# postgresql-server-dev-18 prefix (/usr/lib/postgresql/18).
+WORKDIR /usr/local/src/pg_lake
+# install-fast = install-pg_lake then install-pgduck_server. We split them up:
+# the PG_LDFLAGS override is only meant for the pgduck_server link (Debian
+# keeps libpgcommon/libpgport in the *pkglibdir*, while pg_config --libdir here
+# is the multiarch dir), but as a command-line variable it would also leak into
+# every extension's shlib link. libduckdb.so and libavro.so are installed into
+# --libdir by the pg_lake Makefiles, so copy them into the pkglibdir for the
+# runtime stage's COPY below.
+RUN set -eux; \
+    PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config; \
+    PG_LIBDIR=$($PG_CONFIG --libdir); \
+    PG_PKGLIBDIR=$($PG_CONFIG --pkglibdir); \
+    make install-pg_lake PG_CONFIG=$PG_CONFIG; \
+    DUCKDB_BUILD_USE_CACHE=1 make install-pgduck_server PG_CONFIG=$PG_CONFIG \
+        PG_LDFLAGS="-lduckdb -L${PG_PKGLIBDIR} -Wl,-rpath,${PG_PKGLIBDIR} -L${PG_LIBDIR} -Wl,-rpath,${PG_LIBDIR}"; \
+    cp -a "$PG_LIBDIR"/libduckdb.so "$PG_PKGLIBDIR/"; \
+    cp -a "$PG_LIBDIR"/libavro.so.* "$PG_PKGLIBDIR/"
+
+# ============================================================================
+# Runtime
+# ============================================================================
+FROM postgres:18.6
+
+LABEL org.opencontainers.image.source="https://github.com/jaredchurch/containers"
+LABEL org.opencontainers.image.licenses="MIT"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# btree_gist is required by pg_lake_table; ca-certificates was pruned from the
+# base image and gives libcurl/httpfs a CA bundle for any HTTPS calls;
+# libcurl4/libsnappy1v5/libgomp1/libjansson4 back the extension .so files; libnuma1,
+# libpam0g/libselinux1/libxslt1.1 back pgduck_server's dynamic dependencies
+# that postgresql-18 doesn't pull in on its own.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        postgresql-contrib-18 \
+        ca-certificates \
+        libcurl4 \
+        libsnappy1v5 \
+        libgomp1 \
+        libjansson4 \
+        libnuma1 \
+        libpam0g \
+        libselinux1 \
+        libxslt1.1 \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+# pg_lake artifacts: extensions (.so), libavro, libduckdb and pgduck_server.
+COPY --from=builder /usr/lib/postgresql/18/lib/          /usr/lib/postgresql/18/lib/
+COPY --from=builder /usr/share/postgresql/18/extension/  /usr/share/postgresql/18/extension/
+COPY --from=builder /usr/lib/postgresql/18/bin/pgduck_server /usr/lib/postgresql/18/bin/
+
+# pg_extension_base must be in shared_preload_libraries or CREATE EXTENSION
+# pg_lake CASCADE aborts. The official entrypoint offers no config hook before
+# the server starts, but initdb derives postgresql.conf from
+# postgresql.conf.sample, so inject it there.
+RUN set -eux; \
+    echo "shared_preload_libraries = 'pg_extension_base'" \
+        >> /usr/share/postgresql/18/postgresql.conf.sample
+
+# Register the pg pkglibdir with the loader (Debian doesn't add it for us),
+# then fail the build if any shared-library dependency is unresolved.
+RUN set -eux; \
+    echo "/usr/lib/postgresql/18/lib" > /etc/ld.so.conf.d/postgresql-pglake.conf; \
+    ldconfig; \
+    ! ldd /usr/lib/postgresql/18/lib/*.so /usr/lib/postgresql/18/bin/pgduck_server 2>/dev/null | grep "not found"
+
+# Start pgduck_server alongside the official entrypoint (it must share the
+# unix socket + tmpdir with the Postgres server, so it runs in this container).
+COPY docker-entrypoint-pgduck.sh /usr/local/bin/docker-entrypoint-pgduck.sh
+# CREATE EXTENSION pg_lake on first init (existing clusters: run it manually).
+COPY init-pglake.sql /docker-entrypoint-initdb.d/10-pglake.sql
+RUN chmod +x /usr/local/bin/docker-entrypoint-pgduck.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-pgduck.sh"]
+CMD ["postgres"]
+
+### End of File
