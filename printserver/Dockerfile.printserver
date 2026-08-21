@@ -21,6 +21,9 @@ RUN apt-get update -qq \
     avahi-daemon \
     printer-driver-brlaser \
     printer-driver-cups-pdf \
+    ghostscript \
+    fonts-freefont-ttf \
+    gsfonts \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /usr/share/doc/* /usr/share/man/*
 
