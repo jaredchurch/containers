@@ -6,11 +6,7 @@ fHeader() {
 # AirPrint Server Startup
 #######################################################################'
     date
-    echo '
-
-
-    '
-
+    echo -e '\n\n'
 }
 
 fAdminUserSetup() {
@@ -28,9 +24,9 @@ fAdminUserSetup() {
     fi
 
     # Add user to lpadmin if needed
-    if [ $(grep -ci $CUPSADMIN /etc/shadow) -eq 0 ]; then
+    if [ $(grep -ci "${CUPSADMIN}" /etc/shadow) -eq 0 ]; then
         echo "Add Admin user to lpadmin"
-        useradd -r -G lpadmin -M $CUPSADMIN
+        useradd -r -G lpadmin -M "${CUPSADMIN}"
     fi
 
     if [ -f "${CUPSPASSWORD_FILE}" ]; then
@@ -47,30 +43,31 @@ fAdminUserSetup() {
     fi
 
     echo "Update Admin User Password"
-    echo $CUPSADMIN:$CUPSPASSWORD | chpasswd
-    echo '
-
-
-    '
+    echo "${CUPSADMIN}:${CUPSPASSWORD}" | chpasswd
+    echo -e '\n\n'
 }
 
 (set +x; fHeader ; fAdminUserSetup)
 
-rm -f /var/run/avahi-daemon/pid
+# Flush stale process IDs
+rm -f /var/run/avahi-daemon/pid /var/run/cups/cupsd.pid
 
-# add tzdata
-ln -fs /usr/share/zoneinfo/$TZ /etc/localtime
-dpkg-reconfigure --frontend noninteractive tzdata
+# Set system timezone via symlink
+if [ -n "${TZ}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
+    ln -fs "/usr/share/zoneinfo/${TZ}" /etc/localtime
+fi
 
-# restore default cups config in case user does not have any
+# Restore default cups config if empty
 if [ ! -f /etc/cups/cupsd.conf ]; then
     cp -rpn /etc/cups-bak/* /etc/cups/
 fi
 
+# Launch background discovery daemon
 /usr/sbin/avahi-daemon &
-/usr/sbin/cupsd -f
 
-tail -f /dev/null
+# Launch foreground printer scheduler daemon (Blocks container execution loop)
+exec /usr/sbin/cupsd -f
+
 
 
 ### End of File
